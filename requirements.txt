@@ -1,0 +1,23 @@
+# 遥感图像分析平台 - 依赖清单
+# Python 3.10+
+
+# 深度学习
+torch>=2.0.0
+torchvision>=0.15.0
+
+# SNN 库
+
+# 数据处理
+numpy>=1.24.0
+opencv-python>=4.8.0
+albumentations>=1.3.0
+
+# 可视化
+streamlit>=1.28.0
+matplotlib>=3.7.0
+Pillow>=10.0.0
+
+# 工具
+tqdm>=4.65.0
+tensorboard>=2.13.0
+pandas>=2.0.0
