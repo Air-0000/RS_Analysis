@@ -21,8 +21,7 @@
 
 | 技术 | 用途 |
 |:----|:------|
-| **PyTorch 2.12** | 深度学习框架 |
-| **snntorch** | 脉冲神经网络组件（前期探索） |
+| **PyTorch** | 深度学习框架 |
 | **Streamlit** | Web 交互界面 |
 | **OpenCV + PIL** | 图像处理 |
 | **Albumentations** | 数据增强 |

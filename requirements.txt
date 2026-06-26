@@ -1,11 +1,5 @@
 # 遥感图像分析平台 - 依赖清单
-# Python 3.10+
-
-# 深度学习
-torch>=2.0.0
-torchvision>=0.15.0
-
-# SNN 库
+# PyTorch 由 setup.sh 根据 GPU/CUDA 自动选装，不在此指定
 
 # 数据处理
 numpy>=1.24.0

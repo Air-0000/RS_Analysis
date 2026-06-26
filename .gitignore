@@ -19,3 +19,6 @@ outputs/
 
 # OS
 .DS_Store
+
+# Setup logs
+setup_*.log

@@ -1,35 +1,37 @@
 #!/bin/bash
-# 遥感图像分析平台 - 一键启动
+# 遥感图像分析平台 — 一键启动
+# 使用 conda run 自动调用 rs_analysis 环境
+#
+# Usage: bash run.sh
 
-set -e
+set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
-# 找 Python
-PYTHON=""
-for p in python3 python; do command -v "$p" &>/dev/null && { PYTHON="$p"; break; }; done
-[ -z "$PYTHON" ] && [ -f "/d/environment/anaconda3/python.exe" ] && PYTHON="/d/environment/anaconda3/python.exe"
-[ -z "$PYTHON" ] && echo "❌ 未找到 Python" && exit 1
+echo "═══════════════════════════════════════════════"
+echo "  🛰️  遥感图像分析平台"
+echo "  功能:  语义分割  |  变化检测"
+echo "═══════════════════════════════════════════════"
 
-echo "========================================="
-echo "  🛰️ 遥感图像分析平台"
-echo "========================================="
-echo ""
-echo "  功能:"
-echo "  📷 语义分割 - 识别地物类别"
-echo "  🔄 变化检测 - 标出变化区域"
-echo ""
+# 检查 Conda 环境
+ENV_NAME="rs_analysis"
+if ! conda env list 2>/dev/null | grep -q "^${ENV_NAME}[[:space:]]"; then
+    echo "❌ 环境 '$ENV_NAME' 不存在，请先运行: bash setup.sh"
+    exit 1
+fi
 
 # 检查模型
-HAS_CD=0; HAS_SEG=0
-[ -f "outputs/best_siamdiff.pth" ] && HAS_CD=1
-[ -f "outputs/best_unet.pth" ] && HAS_SEG=1
-
-echo "📦 模型状态:"
-[ $HAS_CD -eq 1 ] && echo "  ✅ 变化检测: best_siamdiff.pth" || echo "  ❌ 变化检测: 未训练 (python train.py)"
-[ $HAS_SEG -eq 1 ] && echo "  ✅ 语义分割: best_unet.pth" || echo "  ❌ 语义分割: 未训练 (python train_seg.py)"
 echo ""
+echo "📦 模型状态:"
+CONDA_RUN="conda run -n $ENV_NAME --no-capture-output"
+[ -f "outputs/best_siamdiff.pth" ] \
+    && echo "  ✅ 变化检测: best_siamdiff.pth" \
+    || echo "  ⚠️  变化检测: 未训练 (conda run -n $ENV_NAME python train.py)"
+[ -f "outputs/best_unet.pth" ] \
+    && echo "  ✅ 语义分割: best_unet.pth" \
+    || echo "  ⚠️  语义分割: 未训练 (conda run -n $ENV_NAME python train_seg.py)"
 
+echo ""
 echo "🚀 启动界面..."
-NO_ALBUMENTATIONS_UPDATE=1 $PYTHON -m streamlit run app.py --server.port 8501 --server.headless true
+exec $CONDA_RUN streamlit run app.py --server.port 8501 --server.headless true
