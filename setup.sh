@@ -123,25 +123,32 @@ case "$OS_NAME" in
             fi
             
             if [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 13 ] 2>/dev/null; then
+                CUDA_SUFFIX="cu130"
+                [ "$TORCH_MIRROR" = "aliyun" ] && CUDA_SUFFIX="+cu130" || CUDA_SUFFIX=""
                 [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu130" \
                     || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu130"
-                TORCH_VERSION="2.12.1"
-                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu130"
+                TORCH_VERSION="2.12.1${CUDA_SUFFIX}"
+                TV_VERSION="0.27.1${CUDA_SUFFIX}"
+                echo "  → 选用: PyTorch ${TORCH_VERSION}"
             elif [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 12 ] 2>/dev/null; then
+                [ "$TORCH_MIRROR" = "aliyun" ] && CUDA_SUFFIX="+cu121" || CUDA_SUFFIX=""
                 [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu121" \
                     || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu121"
-                TORCH_VERSION="2.12.1"
-                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu121"
+                TORCH_VERSION="2.12.1${CUDA_SUFFIX}"
+                TV_VERSION="0.27.1${CUDA_SUFFIX}"
+                echo "  → 选用: PyTorch ${TORCH_VERSION}"
             else
+                [ "$TORCH_MIRROR" = "aliyun" ] && CUDA_SUFFIX="+cu118" || CUDA_SUFFIX=""
                 [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu118" \
                     || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu118"
-                TORCH_VERSION="2.4.0"
-                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu118"
+                TORCH_VERSION="2.4.0${CUDA_SUFFIX}"
+                TV_VERSION="0.19.0${CUDA_SUFFIX}"
             fi
         elif [ "$OS_NAME" = "linux" ] && detect_amd_rocm; then
             echo "  GPU: $GPU_NAME"
             TORCH_INDEX_URL="https://download.pytorch.org/whl/rocm6.2"
             TORCH_VERSION="2.4.0"
+            TV_VERSION="0.19.0"
             echo "  → 选用: PyTorch ${TORCH_VERSION}+ROCm"
         else
             echo "  未检测到 NVIDIA/AMD GPU → CPU-only"
@@ -150,19 +157,21 @@ case "$OS_NAME" in
     macos)
         if detect_apple_mps; then
             echo "  GPU: $GPU_NAME (MPS 加速)"
-            # macOS PyTorch: CPU build 自带 MPS 支持
             TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
             TORCH_VERSION="2.4.0"
+            TV_VERSION="0.19.0"
             echo "  → 选用: PyTorch ${TORCH_VERSION} (MPS)"
         elif detect_nvidia; then
             echo "  GPU: $GPU_NAME (Intel Mac, 不推荐)"
             echo "  ⚠️  macOS 上 CUDA 支持已废弃，使用 CPU 版"
             TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
             TORCH_VERSION="2.4.0"
+            TV_VERSION="0.19.0"
         else
             echo "  未检测到 GPU → CPU-only"
             TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
             TORCH_VERSION="2.4.0"
+            TV_VERSION="0.19.0"
         fi
         ;;
 esac
@@ -170,6 +179,7 @@ esac
 if [ -z "$TORCH_INDEX_URL" ]; then
     TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
     TORCH_VERSION="2.4.0"
+    TV_VERSION="0.19.0"
     echo "  → 使用 CPU-only 版本"
 fi
 echo ""
@@ -258,8 +268,6 @@ $CONDA_RUN pip cache purge 2>/dev/null || true
 
 # ── 安装 PyTorch ──────────────────────────────────
 echo "📥 安装 PyTorch $TORCH_VERSION..."
-TV_VERSION=$(echo "$TORCH_VERSION" | sed 's/\.[0-9]*$//')
-
 PIP_EXTRA="--timeout $PIP_TIMEOUT"
 [ "$TORCH_MIRROR" = "aliyun" ] && PIP_EXTRA="$PIP_EXTRA --trusted-host mirrors.aliyun.com"
 
