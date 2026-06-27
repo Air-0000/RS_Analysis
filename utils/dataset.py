@@ -27,12 +27,8 @@ class ChangeDetectionDataset(Dataset):
     """遥感变化检测数据集 (LEVIR-CD / DSIFN-CD 格式)"""
 
     def __init__(self, data_root, split='train', transform=None):
-        """
-        Args:
-            data_root: 数据集根目录
-            split: 'train', 'val', 或 'test'
-            transform: albumentations 数据增强
-        """
+        """data_root: 根目录, split: 训练/验证/测试, transform: 数据增强"""
+
         self.data_root = data_root
         self.split = split
         self.transform = transform or self._get_default_transform()

@@ -9,7 +9,7 @@ FC-Siam-diff 变化检测模型 (标准版)
   → 解码器 + skip connection (U-Net 风格)
   → 变化图输出
 
-参数量: ~625K (标准的通道减半轻量版)
+参数量: ~625K (通道减半轻量版)
 """
 
 import torch

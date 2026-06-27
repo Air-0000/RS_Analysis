@@ -24,12 +24,8 @@ class DoubleConv(nn.Module):
 
 class TinyUNet(nn.Module):
     def __init__(self, in_channels=3, num_classes=1, base_ch=16):
-        """
-        Args:
-            in_channels: 输入通道数 (默认 3=RGB)
-            num_classes: 输出类别数 (1=二类建筑分割, 24=多类)
-            base_ch: 基础通道数
-        """
+        """in_channels: 输入通道, num_classes: 输出类别, base_ch: 基础通道"""
+
         super().__init__()
         c = base_ch
         self.num_classes = num_classes

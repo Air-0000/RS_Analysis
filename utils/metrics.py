@@ -9,17 +9,7 @@ import numpy as np
 
 
 def compute_metrics(pred, target, threshold=0.5):
-    """
-    计算变化检测指标
-
-    Args:
-        pred: (B, 1, H, W) 概率图
-        target: (B, H, W) 二值标注
-        threshold: 二值化阈值
-
-    Returns:
-        dict: 各项指标
-    """
+    """计算 IoU / F1 / Precision / Recall / Accuracy"""
     pred = (pred.squeeze(1) > threshold).float()
     target = target.float()
 
