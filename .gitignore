@@ -28,3 +28,17 @@ setup_*.log
 
 # Temp download cache
 .torch_wheels/
+
+# LaTeX compilation artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+*.synctex.gz
+*.bbl
+*.blg
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
