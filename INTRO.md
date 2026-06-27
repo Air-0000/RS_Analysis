@@ -963,9 +963,8 @@ def overlay_mask(image: np.ndarray, mask: np.ndarray, color: tuple = (255, 0, 0)
 
 ### 9.2 自动配置（推荐）
 
-```bash
-bash setup.sh
-```
+**Windows：** 双击 `setup.bat`
+**macOS / Linux：** 终端运行 `bash setup.sh`
 
 脚本自动完成：
 1. 检测 GPU / CUDA 驱动版本，选择 cu130 / cu121 / cu118 PyTorch
@@ -1006,10 +1005,12 @@ python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, MPS: {torch.
 ### 9.4 启动
 
 ```bash
-bash run.sh
+bash run.sh                               # macOS / Linux
 # 或手动:
 conda run -n rs_analysis streamlit run app.py --server.port 8501 --server.headless true
 ```
+
+Windows 用户可在 Git Bash 中运行 `bash run.sh`，或使用 `conda run`。
 
 访问 `http://localhost:8501`
 

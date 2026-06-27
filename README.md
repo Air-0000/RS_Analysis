@@ -15,6 +15,9 @@
 
 ## 快速开始
 
+**Windows 用户：** 双击 `setup.bat`（会自动检测 Git Bash）
+**macOS / Linux 用户：** 终端运行：
+
 ```bash
 # 1. 配置环境
 bash setup.sh
