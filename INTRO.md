@@ -142,7 +142,7 @@ run.sh
         ├── 导入 models/unet_tiny.py → TinyUNet
         └── 加载 outputs/best_*.pth 权重
 
-train.py (变化检测训练)
+train_cd.py (变化检测训练)
   ├── 导入 models/cnn_cd.py
   ├── 导入 utils/dataset.py → ChangeDetectionDataset
   └── 导入 utils/metrics.py → 评估指标
@@ -652,7 +652,7 @@ for epoch in range(EPOCHS):
 | `weight_decay=1e-4` | 轻量正则 | 2M 参数不需要强正则，过大 weight decay 会欠拟合 |
 | `BCEWithLogitsLoss` | 直接 logits | 数值稳定，内部做 Sigmoid+BCE，比分开写防止梯度消失 |
 
-### 6.2 变化检测训练（`train.py`）
+### 6.2 变化检测训练（`train_cd.py`）
 
 ```python
 # 超参数
@@ -690,7 +690,7 @@ criterion = nn.BCEWithLogitsLoss()
 | 训练总计 | ~3,500 MB | 仅占 16GB 的 ~22% |
 | **推理** | **~500 MB** | 无梯度缓存 |
 
-**变化检测（`train.py` batch_size=32）：**
+**变化检测（`train_cd.py` batch_size=32）：**
 
 | 阶段 | 显存占用 | 说明 |
 |:-----|:--------|:-----|
@@ -1033,7 +1033,7 @@ bash data/download.sh
 | 情况 | 建议 |
 |:-----|:-----|
 | RTX 5060 Ti 16GB + 核显输出 | 优先：显示器插主板，独占全部 16GB VRAM |
-| 显存不足 (OOM) | 降低 `batch_size`：`python train.py --batch_size 16` |
+| 显存不足 (OOM) | 降低 `batch_size`：`python train_cd.py --batch_size 16` |
 | 多 GPU | 当前未实现 DataParallel，只能单卡训练 |
 | 仅 CPU | `setup.sh` 自动检测并安装 CPU 版 PyTorch |
 
@@ -1044,8 +1044,8 @@ bash data/download.sh
 ```
 RS_Analysis/
 ├── app.py                      # [核心] Streamlit 双模式 Web 界面
-├── train.py                    # [核心] 变化检测训练脚本 (FC-Siam-diff)
-├── train_seg.py                # [核心] 语义分割训练脚本 (Tiny U-Net)
+├── train_cd.py                    # [核心] 变化检测训练脚本 (FC-Siam-diff)
+├── train_segment.py                # [核心] 语义分割训练脚本 (Tiny U-Net)
 │
 ├── setup.sh                    # [配置] 一键环境配置 (GPU检测+conda+pip)
 ├── run.sh                      # [配置] 一键启动 (Streamlit)

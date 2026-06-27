@@ -27,10 +27,10 @@ echo "📦 模型状态:"
 CONDA_RUN="conda run -n $ENV_NAME --no-capture-output"
 [ -f "outputs/best_siamdiff.pth" ] \
     && echo "  ✅ 变化检测: best_siamdiff.pth" \
-    || echo "  ⚠️  变化检测: 未训练 (conda run -n $ENV_NAME python train.py)"
+    || echo "  ⚠️  变化检测: 未训练 (conda run -n $ENV_NAME python train_cd.py)"
 [ -f "outputs/best_unet.pth" ] \
     && echo "  ✅ 语义分割: best_unet.pth" \
-    || echo "  ⚠️  语义分割: 未训练 (conda run -n $ENV_NAME python train_seg.py)"
+    || echo "  ⚠️  语义分割: 未训练 (conda run -n $ENV_NAME python train_segment.py)"
 
 echo ""
 echo "🚀 启动界面..."
