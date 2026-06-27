@@ -1,6 +1,7 @@
 #!/bin/bash
-# 遥感图像分析平台 — 环境一键配置
-# 自动检测 GPU/CUDA，选择匹配的 PyTorch 版本
+# 遥感图像分析平台 — 环境一键配置（跨平台版）
+# 支持: Windows (git-bash), macOS (Intel/Apple Silicon), Linux
+# 自动检测 GPU/CUDA/MPS，选择匹配的 PyTorch 版本
 # 自动选择可用镜像源（中国优先，全球降级）
 # 所有输出写入 setup_<时间戳>.log
 #
@@ -10,7 +11,7 @@ set -euo pipefail
 
 PIP_TIMEOUT=120
 ENV_NAME="rs_analysis"
-MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"
+MINICONDA_BASE="https://repo.anaconda.com/miniconda"
 
 # ── 日志 ──────────────────────────────────────────────
 LOG_FILE="setup_$(date +%Y%m%d_%H%M%S).log"
@@ -25,34 +26,36 @@ echo "  日志: $LOG_FILE"
 echo "═══════════════════════════════════════════════"
 echo ""
 
-# ── 镜像源检测 ────────────────────────────────────
-# 国内优先走阿里云/清华，连不上则降级到官方源
-echo "🌐 检测镜像源..."
+# ── 操作系统检测 ──────────────────────────────────
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+case "$OS" in
+    Linux*)      OS_NAME="linux"   ;;
+    Darwin*)     OS_NAME="macos"   ;;
+    MINGW*|MSYS*) OS_NAME="windows" ;;
+    *) echo "❌ 不支持的系统: $OS (请使用 bash/git-bash)"; exit 1 ;;
+esac
+echo "💻 系统: $OS_NAME ($ARCH)"
+echo ""
 
+# ── 镜像源检测 ────────────────────────────────────
+echo "🌐 检测镜像源..."
 PIP_INDEX="https://pypi.org/simple"
 PIP_TRUSTED=""
 TORCH_FALLBACK_INDEX="https://download.pytorch.org/whl"
+TORCH_MIRROR="official"
 
-# 测试清华 PyPI
 if curl -sI --max-time 5 "https://pypi.tuna.tsinghua.edu.cn/simple" >/dev/null 2>&1; then
     PIP_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
     PIP_TRUSTED="--trusted-host pypi.tuna.tsinghua.edu.cn"
-    echo "  📦 PyPI 镜像: 清华 (Tsinghua)"
-else
-    echo "  📦 PyPI 源: 官方 (pypi.org)"
+    echo "  📦 PyPI 镜像: 清华"
 fi
-
-# 测试阿里云 PyTorch
-TORCH_INDEX=""
 if curl -sI --max-time 5 "https://mirrors.aliyun.com/pytorch-wheels/cu130/" >/dev/null 2>&1; then
     TORCH_MIRROR="aliyun"
     echo "  🔥 PyTorch 镜像: 阿里云"
 else
-    TORCH_MIRROR="official"
-    echo "  🔥 PyTorch 源: 官方 (download.pytorch.org)"
+    echo "  🔥 PyTorch 源: 官方"
 fi
-
-# 测试清华 Conda
 CONDA_CHANNEL=""
 if curl -sI --max-time 5 "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/" >/dev/null 2>&1; then
     CONDA_CHANNEL="--channel https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main/"
@@ -60,70 +63,114 @@ if curl -sI --max-time 5 "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/mai
 fi
 echo ""
 
-# ── 硬件检测 ──────────────────────────────────────
+# ── 硬件与 PyTorch 版本检测 ──────────────────────
 echo "🔍 检测硬件..."
-GPU_NAME=""; CUDA_MAJOR=""; TORCH_INDEX_URL=""; TORCH_VERSION=""
+GPU_NAME=""; TORCH_INDEX_URL=""; TORCH_VERSION=""; HAS_CUDA=0; HAS_MPS=0
 
-if command -v nvidia-smi &>/dev/null; then
-    GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "")
-    
-    if [ -n "$GPU_NAME" ]; then
-        # 从 nvidia-smi 顶部信息中提取 CUDA UMD 版本
-        # 输出: "CUDA UMD Version: 13.3"
-        CUDA_VER=$(nvidia-smi 2>/dev/null | grep "CUDA UMD Version" | sed 's/.*CUDA UMD Version: *//' | head -1 || echo "")
-        CC_RAW=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 || echo "")
-        
-        echo "  GPU: $GPU_NAME"
-        [ -n "$CUDA_VER" ] && echo "  CUDA: $CUDA_VER"
-        [ -n "$CC_RAW" ] && echo "  Compute Capability: $CC_RAW"
-        
-        if [ -n "$CUDA_VER" ]; then
-            CUDA_MAJOR=$(echo "$CUDA_VER" | sed 's/\..*//')
-        else
-            # 降级：从 driver version 反推（driver 525+ = CUDA 12, 610+ = CUDA 13）
-            DRV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 || echo "")
-            DRV_MAJOR=$(echo "$DRV_VER" | sed 's/\..*//')
-            [ "$DRV_MAJOR" -ge 610 ] 2>/dev/null && CUDA_MAJOR=13 || true
-            [ "$DRV_MAJOR" -ge 525 ] 2>/dev/null && [ "$DRV_MAJOR" -lt 610 ] 2>/dev/null && CUDA_MAJOR=12 || true
+detect_nvidia() {
+    if command -v nvidia-smi &>/dev/null; then
+        local name
+        name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "")
+        [ -n "$name" ] && GPU_NAME="$name" && HAS_CUDA=1 && return 0
+    fi
+    return 1
+}
+
+detect_apple_mps() {
+    # Apple Silicon 且有 Python 时检测 MPS
+    if [ "$OS_NAME" = "macos" ] && [ "$ARCH" = "arm64" ]; then
+        # 检查是否已有 torch 安装
+        if python3 -c "import torch; print(torch.backends.mps.is_available())" 2>/dev/null | grep -q True; then
+            GPU_NAME="Apple Silicon (MPS)"
+            HAS_MPS=1
+            return 0
         fi
-        
-        # 选 PyTorch 版本
-        if [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 13 ] 2>/dev/null; then
-            if [ "$TORCH_MIRROR" = "aliyun" ]; then
-                TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu130"
-            else
-                TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu130"
+    fi
+    return 1
+}
+
+detect_amd_rocm() {
+    if command -v rocm-smi &>/dev/null; then
+        local name
+        name=$(rocm-smi --showproductname 2>/dev/null | grep "GPU" | head -1 || echo "")
+        [ -n "$name" ] && GPU_NAME="AMD GPU (ROCm)" && HAS_CUDA=1 && return 0
+    fi
+    return 1
+}
+
+case "$OS_NAME" in
+    windows|linux)
+        if detect_nvidia; then
+            # 提取 CUDA 版本
+            CUDA_VER=$(nvidia-smi 2>/dev/null | grep -i "CUDA Version" | sed 's/.*CUDA Version: *//' | cut -d' ' -f1 | head -1 || echo "")
+            if [ -z "$CUDA_VER" ]; then
+                CUDA_VER=$(nvidia-smi 2>/dev/null | grep "CUDA UMD Version" | sed 's/.*CUDA UMD Version: *//' | head -1 || echo "")
             fi
-            TORCH_VERSION="2.12.1"
-            echo "  → 选用: PyTorch ${TORCH_VERSION}+cu130"
-        elif [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 12 ] 2>/dev/null; then
-            if [ "$TORCH_MIRROR" = "aliyun" ]; then
-                TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu121"
-            else
-                TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu121"
+            CC_RAW=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 || echo "")
+            
+            echo "  GPU: $GPU_NAME"
+            [ -n "$CUDA_VER" ] && echo "  CUDA: $CUDA_VER"
+            [ -n "$CC_RAW" ] && echo "  Compute Capability: $CC_RAW"
+            
+            CUDA_MAJOR=$(echo "$CUDA_VER" | sed 's/\..*//')
+            
+            if [ -z "$CUDA_MAJOR" ]; then
+                # 降级从驱动版本反推
+                DRV_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 || echo "")
+                DRV_MAJOR=$(echo "$DRV_VER" | sed 's/\..*//')
+                [ -n "$DRV_MAJOR" ] && [ "$DRV_MAJOR" -ge 610 ] 2>/dev/null && CUDA_MAJOR=13
+                [ -n "$DRV_MAJOR" ] && [ "$DRV_MAJOR" -ge 525 ] 2>/dev/null && [ "$DRV_MAJOR" -lt 610 ] 2>/dev/null && CUDA_MAJOR=12
             fi
-            TORCH_VERSION="2.12.1"
-            echo "  → 选用: PyTorch ${TORCH_VERSION}+cu121"
+            
+            if [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 13 ] 2>/dev/null; then
+                [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu130" \
+                    || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu130"
+                TORCH_VERSION="2.12.1"
+                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu130"
+            elif [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 12 ] 2>/dev/null; then
+                [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu121" \
+                    || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu121"
+                TORCH_VERSION="2.12.1"
+                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu121"
+            else
+                [ "$TORCH_MIRROR" = "aliyun" ] && TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu118" \
+                    || TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu118"
+                TORCH_VERSION="2.4.0"
+                echo "  → 选用: PyTorch ${TORCH_VERSION}+cu118"
+            fi
+        elif [ "$OS_NAME" = "linux" ] && detect_amd_rocm; then
+            echo "  GPU: $GPU_NAME"
+            TORCH_INDEX_URL="https://download.pytorch.org/whl/rocm6.2"
+            TORCH_VERSION="2.4.0"
+            echo "  → 选用: PyTorch ${TORCH_VERSION}+ROCm"
         else
-            echo "  ⚠️  CUDA 版本较旧，尝试 cu118"
-            if [ "$TORCH_MIRROR" = "aliyun" ]; then
-                TORCH_INDEX_URL="https://mirrors.aliyun.com/pytorch-wheels/cu118"
-            else
-                TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cu118"
-            fi
+            echo "  未检测到 NVIDIA/AMD GPU → CPU-only"
+        fi
+        ;;
+    macos)
+        if detect_apple_mps; then
+            echo "  GPU: $GPU_NAME (MPS 加速)"
+            # macOS PyTorch: CPU build 自带 MPS 支持
+            TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
+            TORCH_VERSION="2.4.0"
+            echo "  → 选用: PyTorch ${TORCH_VERSION} (MPS)"
+        elif detect_nvidia; then
+            echo "  GPU: $GPU_NAME (Intel Mac, 不推荐)"
+            echo "  ⚠️  macOS 上 CUDA 支持已废弃，使用 CPU 版"
+            TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
+            TORCH_VERSION="2.4.0"
+        else
+            echo "  未检测到 GPU → CPU-only"
+            TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
             TORCH_VERSION="2.4.0"
         fi
-    else
-        echo "  ⚠️  nvidia-smi 检测失败（可能无权限或无驱动）"
-    fi
-else
-    echo "  未找到 nvidia-smi（可能无 NVIDIA GPU）"
-fi
+        ;;
+esac
 
 if [ -z "$TORCH_INDEX_URL" ]; then
-    echo "  → 使用 CPU-only 版本"
     TORCH_INDEX_URL="$TORCH_FALLBACK_INDEX/cpu"
     TORCH_VERSION="2.4.0"
+    echo "  → 使用 CPU-only 版本"
 fi
 echo ""
 
@@ -136,28 +183,55 @@ fi
 
 if [ -z "$CONDA_BASE" ]; then
     echo "  ⚠️  未找到 Conda，安装 Miniconda..."
-    INSTALLER="$TMP/Miniconda3-latest-Windows-x86_64.exe"
-    [ -z "$TMP" ] && INSTALLER="$HOME/Miniconda3-latest-Windows-x86_64.exe"
     
-    curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
-    echo "  运行安装程序 (静默安装)..."
+    # 选择安装器
+    case "$OS_NAME" in
+        windows)
+            INSTALLER="$TMP/Miniconda3-latest-Windows-x86_64.exe"
+            [ -z "${TMP:-}" ] && INSTALLER="$HOME/Miniconda3-latest-Windows-x86_64.exe"
+            MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-Windows-x86_64.exe"
+            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            echo "  运行安装程序..."
+            cmd //c "$INSTALLER" /S "/D=$HOME/miniconda3" 2>/dev/null || \
+                "$INSTALLER" /S "/D=$HOME/miniconda3"
+            rm -f "$INSTALLER"
+            export PATH="$HOME/miniconda3/Scripts:$HOME/miniconda3:$PATH"
+            ;;
+        macos)
+            if [ "$ARCH" = "arm64" ]; then
+                INSTALLER="/tmp/Miniconda3-latest-MacOSX-arm64.sh"
+                MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-MacOSX-arm64.sh"
+            else
+                INSTALLER="/tmp/Miniconda3-latest-MacOSX-x86_64.sh"
+                MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-MacOSX-x86_64.sh"
+            fi
+            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            bash "$INSTALLER" -b -p "$HOME/miniconda3"
+            rm -f "$INSTALLER"
+            export PATH="$HOME/miniconda3/bin:$PATH"
+            ;;
+        linux)
+            INSTALLER="/tmp/Miniconda3-latest-Linux-x86_64.sh"
+            MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-Linux-x86_64.sh"
+            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            bash "$INSTALLER" -b -p "$HOME/miniconda3"
+            rm -f "$INSTALLER"
+            export PATH="$HOME/miniconda3/bin:$PATH"
+            ;;
+    esac
     
-    # Windows 下 .exe 不能用 bash 执行，用 cmd 或 start
-    if [ -f "$INSTALLER" ]; then
-        cmd //c "$INSTALLER" /S "/D=$HOME/miniconda3" 2>/dev/null || \
-        start /wait "" "$INSTALLER" /S "/D=$HOME/miniconda3" 2>/dev/null || \
-        "$INSTALLER" /S "/D=$HOME/miniconda3"
-        rm -f "$INSTALLER"
-    fi
-    
-    # 添加到 PATH
-    export PATH="$HOME/miniconda3/Scripts:$HOME/miniconda3:$PATH"
     CONDA_BASE="$HOME/miniconda3"
     echo "  ✅ Miniconda 已安装到 $CONDA_BASE"
 else
     echo "  ✅ Conda: $CONDA_BASE"
 fi
 echo ""
+
+# ── Conda 初始化 (确保 conda run 可用) ────────────
+# conda 4.14+ 的 conda run 需要初始化 shell 集成
+if [ "$OS_NAME" != "windows" ]; then
+    conda init bash 2>/dev/null || true
+fi
 
 # ── 创建环境 ──────────────────────────────────────
 echo "🔧 创建 Conda 环境: $ENV_NAME"
@@ -166,17 +240,16 @@ if conda env list | grep -q "^${ENV_NAME}[[:space:]]"; then
 else
     for i in 1 2 3; do
         echo "  尝试 ($i/3)..."
-        # 有清华镜像就用，否则用默认
-        if [ -n "$CONDA_CHANNEL" ]; then
-            conda create -y -n "$ENV_NAME" python=3.12 pip $CONDA_CHANNEL 2>/dev/null && break
-        else
-            conda create -y -n "$ENV_NAME" python=3.12 pip 2>/dev/null && break
+        OPTS=""
+        [ -n "$CONDA_CHANNEL" ] && OPTS="$CONDA_CHANNEL"
+        if conda create -y -n "$ENV_NAME" python=3.12 pip $OPTS 2>/dev/null; then
+            echo "  ✅ 创建成功"
+            break
         fi
         [ "$i" -eq 3 ] && echo "  ❌ 创建失败，请检查网络后重试" && exit 1
-        echo "  网络超时，5 秒后重试..."
+        echo "  5 秒后重试..."
         sleep 5
     done
-    echo "  ✅ 创建成功"
 fi
 echo ""
 
@@ -187,11 +260,8 @@ $CONDA_RUN pip cache purge 2>/dev/null || true
 echo "📥 安装 PyTorch $TORCH_VERSION..."
 TV_VERSION=$(echo "$TORCH_VERSION" | sed 's/\.[0-9]*$//')
 
-# 构造 pip extra args
 PIP_EXTRA="--timeout $PIP_TIMEOUT --quiet"
-if [ "$TORCH_MIRROR" = "aliyun" ]; then
-    PIP_EXTRA="$PIP_EXTRA --trusted-host mirrors.aliyun.com"
-fi
+[ "$TORCH_MIRROR" = "aliyun" ] && PIP_EXTRA="$PIP_EXTRA --trusted-host mirrors.aliyun.com"
 
 for i in 1 2 3; do
     echo "  尝试 ($i/3)..."
@@ -203,7 +273,6 @@ for i in 1 2 3; do
         break
     fi
     [ "$i" -eq 3 ] && echo "  ⚠️  PyTorch 安装失败，跳过（可手动安装）" && break
-    echo "  3 秒后重试..."
     sleep 3
 done
 echo ""
@@ -231,15 +300,19 @@ echo "🧪 验证安装..."
 $CONDA_RUN python -c "
 import torch, sys
 print(f'PyTorch: {torch.__version__}')
-print(f'CUDA 可用: {torch.cuda.is_available()}')
+
 if torch.cuda.is_available():
+    print(f'CUDA 可用: True')
     print(f'GPU: {torch.cuda.get_device_name(0)}')
     print(f'显存: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
     x = torch.randn(100, 100).cuda()
     y = x @ x.T
     print(f'CUDA 矩阵运算: ✅ ({(y.sum().item()):.2f})')
+elif torch.backends.mps.is_available():
+    print(f'MPS 可用: True (Apple Silicon)')
+    print(f'⚠️  MPS 当前仅部分算子支持，训练变化检测推荐用 CPU')
 else:
-    print('⚠️  GPU 不可用，使用 CPU')
+    print('GPU: 未检测到 (使用 CPU)')
 " 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
 
 echo ""

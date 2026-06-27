@@ -956,10 +956,10 @@ def overlay_mask(image: np.ndarray, mask: np.ndarray, color: tuple = (255, 0, 0)
 
 | 依赖 | 说明 |
 |:-----|:------|
-| **操作系统** | Windows 10+ (本项目在 Windows 10 上测试) |
-| **GPU 驱动** | NVIDIA Driver ≥ 610.62（CUDA 13.3） |
+| **操作系统** | Windows 10+ (git-bash), macOS (Intel/Apple Silicon), Linux |
+| **GPU 驱动** | NVIDIA (CUDA 12+), Apple Silicon (MPS), 或 AMD ROCm |
 | **Conda** | Anaconda 或 Miniconda（自动检测，可选安装） |
-| **网络** | 需要访问阿里云镜像（pytorch 镜像）、清华 PyPI 镜像 |
+| **网络** | 需要访问 PyTorch 或 PyPI 镜像（脚本自动检测可用源） |
 
 ### 9.2 自动配置（推荐）
 
@@ -982,20 +982,25 @@ bash setup.sh
 conda create -n rs_analysis python=3.12 pip
 conda activate rs_analysis
 
-# 2. 安装 PyTorch（根据你的 CUDA 版本选择）
-# CUDA 13.x: 
+# 2. 安装 PyTorch（根据你的平台选择）
+# --- NVIDIA GPU (CUDA 13.x, 如 Blackwell RTX 50系列) ---
 pip install torch==2.12.1 torchvision==2.12.1 \
   --index-url https://mirrors.aliyun.com/pytorch-wheels/cu130
-# CUDA 12.x:
+# --- NVIDIA GPU (CUDA 12.x) ---
 pip install torch==2.12.1 torchvision==2.12.1 \
   --index-url https://mirrors.aliyun.com/pytorch-wheels/cu121
-# 无 GPU:
+# --- Apple Silicon (MPS 加速) ---
+pip install torch==2.4.0 torchvision==2.4.0
+# --- CPU only ---
 pip install torch==2.4.0 torchvision==2.4.0 \
   --index-url https://download.pytorch.org/whl/cpu
 
-# 3. 安装项目依赖
-pip install -r requirements.txt \
-  -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 3. 安装项目依赖（中国用户可用清华镜像加速）
+pip install -r requirements.txt
+# 或: pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 4. 验证 GPU
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, MPS: {torch.backends.mps.is_available()}')"
 ```
 
 ### 9.4 启动
