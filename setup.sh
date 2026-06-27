@@ -104,7 +104,7 @@ case "$OS_NAME" in
             # 提取 CUDA 版本
             CUDA_VER=$(nvidia-smi 2>/dev/null | grep -i "CUDA Version" | sed 's/.*CUDA Version: *//' | cut -d' ' -f1 | head -1 || echo "")
             if [ -z "$CUDA_VER" ]; then
-                CUDA_VER=$(nvidia-smi 2>/dev/null | grep "CUDA UMD Version" | sed 's/.*CUDA UMD Version: *//' | head -1 || echo "")
+                CUDA_VER=$(nvidia-smi 2>/dev/null | grep "CUDA UMD Version" | sed 's/.*CUDA UMD Version: *//' | cut -d' ' -f1 | head -1 || echo "")
             fi
             CC_RAW=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 || echo "")
             
