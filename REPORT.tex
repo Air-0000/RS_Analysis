@@ -57,7 +57,7 @@
 {\large \textbf{《人工智能基础B》课程项目主报告}}\\[0.5cm]
 \vfill
 \begin{tabular}{rl}
-\textbf{小组成员：} & Air-0000、Member2、Member3 \\
+\textbf{小组成员：} & 刘正阳、李正杨、龙耀辉、李婉瑶 \\
 \textbf{完成日期：} & 2026年6月 \\
 \end{tabular}
 \vspace{2cm}
@@ -105,9 +105,10 @@
 \toprule
 成员 & 职责 & 具体工作内容 \\
 \midrule
-Air-0000 & 方案设计与算法实现 & 模型架构设计、训练脚本编写、超参数调优 \\
-Member2 & 数据处理与界面开发 & 数据集加载模块、Streamlit 交互界面、可视化 \\
-Member3 & 报告撰写与测试验证 & 实验记录、性能测试、报告与视频录制 \\
+刘正阳 & 方案设计与算法实现 & 模型架构设计、训练脚本编写、超参数调优 \\
+李正杨 & 数据处理与界面开发 & 数据集加载模块、Streamlit 交互界面、可视化 \\
+龙耀辉 & 报告撰写与测试验证 & 实验记录、性能测试、报告与视频录制 \\
+李婉瑶 & 方案复现与错误测试 & 模型复现验证、边界情况测试、交叉验证实验 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -173,13 +174,13 @@ CUDA 13.3 & GPU 加速 & 适配 RTX 5060 Ti (sm\_120) \\
 \toprule
 模块 & 功能 & 技术栈 & 负责人 \\
 \midrule
-数据加载模块 & LEVIR-CD / WHU 数据读取 & Python, OpenCV & Member2 \\
-数据增强模块 & 实时增强（翻转/旋转/归一化） & Albumentations & Air-0000 \\
-模型定义模块 & Tiny U-Net / FC-Siam-diff & PyTorch & Air-0000 \\
-训练模块 & 训练/验证循环、指标记录 & PyTorch, TensorBoard & Air-0000 \\
-推理模块 & 模型加载、前向传播、后处理 & PyTorch, NumPy & Air-0000 \\
-界面模块 & 文件上传、结果展示、交互控制 & Streamlit & Member2 \\
-测试模块 & 功能/性能/稳定性测试 & Python, time & Member3 \\
+数据加载模块 & LEVIR-CD / WHU 数据读取 & Python, OpenCV & 李正杨 \\
+数据增强模块 & 实时增强（翻转/旋转/归一化） & Albumentations & 刘正阳 \\
+模型定义模块 & Tiny U-Net / FC-Siam-diff & PyTorch & 刘正阳 \\
+训练模块 & 训练/验证循环、指标记录 & PyTorch, TensorBoard & 刘正阳 \\
+推理模块 & 模型加载、前向传播、后处理 & PyTorch, NumPy & 刘正阳 \\
+界面模块 & 文件上传、结果展示、交互控制 & Streamlit & 李正杨 \\
+测试模块 & 功能/性能/稳定性测试 & Python, time & 龙耀辉、李婉瑶 \\
 \bottomrule
 \end{tabular}
 \end{table}
