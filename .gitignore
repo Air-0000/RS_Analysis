@@ -22,3 +22,6 @@ outputs/
 
 # Setup logs
 setup_*.log
+
+# Temp verify script
+.verify_env.py
