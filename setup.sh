@@ -190,7 +190,7 @@ if [ -z "$CONDA_BASE" ]; then
             INSTALLER="$TMP/Miniconda3-latest-Windows-x86_64.exe"
             [ -z "${TMP:-}" ] && INSTALLER="$HOME/Miniconda3-latest-Windows-x86_64.exe"
             MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-Windows-x86_64.exe"
-            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            curl -# -fSL -o "$INSTALLER" "$MINICONDA_URL"
             echo "  运行安装程序..."
             cmd //c "$INSTALLER" /S "/D=$HOME/miniconda3" 2>/dev/null || \
                 "$INSTALLER" /S "/D=$HOME/miniconda3"
@@ -205,7 +205,7 @@ if [ -z "$CONDA_BASE" ]; then
                 INSTALLER="/tmp/Miniconda3-latest-MacOSX-x86_64.sh"
                 MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-MacOSX-x86_64.sh"
             fi
-            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            curl -# -fSL -o "$INSTALLER" "$MINICONDA_URL"
             bash "$INSTALLER" -b -p "$HOME/miniconda3"
             rm -f "$INSTALLER"
             export PATH="$HOME/miniconda3/bin:$PATH"
@@ -213,7 +213,7 @@ if [ -z "$CONDA_BASE" ]; then
         linux)
             INSTALLER="/tmp/Miniconda3-latest-Linux-x86_64.sh"
             MINICONDA_URL="$MINICONDA_BASE/Miniconda3-latest-Linux-x86_64.sh"
-            curl -fsSL -o "$INSTALLER" "$MINICONDA_URL"
+            curl -# -fSL -o "$INSTALLER" "$MINICONDA_URL"
             bash "$INSTALLER" -b -p "$HOME/miniconda3"
             rm -f "$INSTALLER"
             export PATH="$HOME/miniconda3/bin:$PATH"
@@ -260,7 +260,7 @@ $CONDA_RUN pip cache purge 2>/dev/null || true
 echo "📥 安装 PyTorch $TORCH_VERSION..."
 TV_VERSION=$(echo "$TORCH_VERSION" | sed 's/\.[0-9]*$//')
 
-PIP_EXTRA="--timeout $PIP_TIMEOUT --quiet"
+PIP_EXTRA="--timeout $PIP_TIMEOUT"
 [ "$TORCH_MIRROR" = "aliyun" ] && PIP_EXTRA="$PIP_EXTRA --trusted-host mirrors.aliyun.com"
 
 for i in 1 2 3; do
@@ -268,7 +268,7 @@ for i in 1 2 3; do
     if $CONDA_RUN pip install \
         --index-url "$TORCH_INDEX_URL" \
         $PIP_EXTRA \
-        torch=="$TORCH_VERSION" torchvision=="$TV_VERSION" 2>&1 | tail -3; then
+        torch=="$TORCH_VERSION" torchvision=="$TV_VERSION"; then
         echo "  ✅ PyTorch 安装完成"
         break
     fi
@@ -285,8 +285,7 @@ for i in 1 2 3; do
         -r requirements.txt \
         -i "$PIP_INDEX" \
         $PIP_TRUSTED \
-        --timeout "$PIP_TIMEOUT" \
-        --quiet 2>&1 | tail -3; then
+        --timeout "$PIP_TIMEOUT"; then
         echo "  ✅ 项目依赖安装完成"
         break
     fi
