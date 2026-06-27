@@ -25,3 +25,6 @@ setup_*.log
 
 # Temp verify script
 .verify_env.py
+
+# Temp download cache
+.torch_wheels/

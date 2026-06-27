@@ -273,12 +273,35 @@ PIP_EXTRA="--timeout $PIP_TIMEOUT"
 
 for i in 1 2 3; do
     echo "  尝试 ($i/3)..."
-    if $CONDA_RUN pip install \
-        --index-url "$TORCH_INDEX_URL" \
-        $PIP_EXTRA \
-        torch=="$TORCH_VERSION" torchvision=="$TV_VERSION"; then
-        echo "  ✅ PyTorch 安装完成"
-        break
+    if [ "$TORCH_MIRROR" = "aliyun" ] && [ -n "$CUDA_SUFFIX" ]; then
+        # 阿里云镜像：先用 curl 下载 wheel（断点续传），再本地安装
+        WHEEL_DIR="$PROJECT_DIR/.torch_wheels"
+        mkdir -p "$WHEEL_DIR"
+        # 阿里云 wheel 文件名中 +cuXXX 需要 URL 编码为 %2BcuXXX
+        WHL_CUDA_SUFFIX="%2Bcu130"
+        echo "  下载 torch ..."
+        curl -# -fSL --retry 3 --retry-delay 5 \
+            "https://mirrors.aliyun.com/pytorch-wheels/cu130/torch-2.12.1${WHL_CUDA_SUFFIX}-cp312-cp312-win_amd64.whl" \
+            -o "$WHEEL_DIR/torch.whl" 2>&1 || { rm -rf "$WHEEL_DIR"; continue; }
+        echo "  下载 torchvision ..."
+        curl -# -fSL --retry 3 --retry-delay 5 \
+            "https://mirrors.aliyun.com/pytorch-wheels/cu130/torchvision-0.27.1${WHL_CUDA_SUFFIX}-cp312-cp312-win_amd64.whl" \
+            -o "$WHEEL_DIR/torchvision.whl" 2>&1 || { rm -rf "$WHEEL_DIR"; continue; }
+        if $CONDA_RUN pip install "$WHEEL_DIR/torch.whl" "$WHEEL_DIR/torchvision.whl" $PIP_EXTRA; then
+            echo "  ✅ PyTorch 安装完成"
+            rm -rf "$WHEEL_DIR"
+            break
+        fi
+        rm -rf "$WHEEL_DIR"
+    else
+        # 官方源：直接 pip 走 index
+        if $CONDA_RUN pip install \
+            --index-url "$TORCH_INDEX_URL" \
+            $PIP_EXTRA \
+            torch=="$TORCH_VERSION" torchvision=="$TV_VERSION"; then
+            echo "  ✅ PyTorch 安装完成"
+            break
+        fi
     fi
     [ "$i" -eq 3 ] && echo "  ⚠️  PyTorch 安装失败，跳过（可手动安装）" && break
     sleep 3
