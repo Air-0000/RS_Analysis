@@ -257,18 +257,23 @@ USE_BASE=0
 if [ -n "$BASE_PY" ]; then
     HAS_TORCH=$($BASE_PY -c "import torch; print('ok')" 2>/dev/null || echo "")
     if [ -n "$HAS_TORCH" ]; then
-        MISSING=$($BASE_PY -c "
-import pkg_resources
-reqs = [l.strip() for l in open('requirements.txt') if l.strip() and not l.startswith('#') and 'torch' not in l]
+        # 检查核心包是否能导入
+        CAN_IMPORT=$($BASE_PY -c "
+pkgs = ['numpy', 'cv2', 'PIL', 'streamlit', 'tqdm', 'matplotlib', 'albumentations', 'tensorboard', 'pandas']
+missing = [p for p in pkgs if __import__(p) is None]
 try:
-    for r in reqs: pkg_resources.require(r)
+    for p in pkgs: __import__(p)
     print('ok')
 except: print('missing')
 " 2>/dev/null || echo "missing")
-        if [ "$MISSING" = "ok" ]; then
+        if [ "$CAN_IMPORT" = "ok" ]; then
             echo "  ✅ base 环境已满足全部依赖"
             USE_BASE=1
+        else
+            echo "  ⚠️  base 环境缺包，将创建独立环境"
         fi
+    else
+        echo "  ⚠️  base 环境无 PyTorch，将创建独立环境"
     fi
 fi
 
