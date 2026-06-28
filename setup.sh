@@ -248,19 +248,19 @@ echo ""
 # ── 检测 base 环境是否已满足 ─────────────────
 echo "🔍 检查 base 环境..."
 BASE_PY=""
-for p in python3 python; do
-    command -v "$p" &>/dev/null && BASE_PY="$p" && break
-done
-[ -z "$BASE_PY" ] && [ -f "/d/environment/anaconda3/python.exe" ] && BASE_PY="/d/environment/anaconda3/python.exe"
+# 优先检测 Anaconda（用户的主环境）
+[ -f "/d/environment/anaconda3/python.exe" ] && BASE_PY="/d/environment/anaconda3/python.exe"
+# 其次找系统 Python
+[ -z "$BASE_PY" ] && command -v python3 &>/dev/null && BASE_PY="python3"
+[ -z "$BASE_PY" ] && command -v python &>/dev/null && BASE_PY="python"
 
 USE_BASE=0
 if [ -n "$BASE_PY" ]; then
-    HAS_TORCH=$($BASE_PY -c "import torch; print('ok')" 2>/dev/null || echo "")
+    HAS_TORCH=$(KMP_DUPLICATE_LIB_OK=TRUE $BASE_PY -c "import torch; print('ok')" 2>/dev/null || echo "")
     if [ -n "$HAS_TORCH" ]; then
         # 检查核心包是否能导入
-        CAN_IMPORT=$($BASE_PY -c "
+        CAN_IMPORT=$(KMP_DUPLICATE_LIB_OK=TRUE $BASE_PY -c "
 pkgs = ['numpy', 'cv2', 'PIL', 'streamlit', 'tqdm', 'matplotlib', 'albumentations', 'tensorboard', 'pandas']
-missing = [p for p in pkgs if __import__(p) is None]
 try:
     for p in pkgs: __import__(p)
     print('ok')
