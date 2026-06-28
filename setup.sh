@@ -304,10 +304,10 @@ echo ""
 
 # 检查是否需要装 PyTorch
 NEED_TORCH=0
-$PY_RUN -c "import torch; print('ok')" 2>/dev/null || NEED_TORCH=1
+KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN -c "import torch; print('ok')" 2>/dev/null || NEED_TORCH=1
 
 # ── 安装 PyTorch（按需）──────────────────────────
-[ "$NEED_TORCH" -eq 0 ] && echo "📥 PyTorch 已存在，跳过安装 ($($PY_RUN -c "import torch; print(torch.__version__)" 2>/dev/null || echo '?'))" && skip_torch=1
+[ "$NEED_TORCH" -eq 0 ] && echo "📥 PyTorch 已存在，跳过安装 ($(KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN -c "import torch; print(torch.__version__)" 2>/dev/null || echo '?'))" && skip_torch=1
 if [ "${skip_torch:-0}" -eq 0 ]; then
 echo "📥 安装 PyTorch $TORCH_VERSION..."
 PIP_EXTRA="--timeout $PIP_TIMEOUT"
@@ -388,7 +388,7 @@ elif torch.backends.mps.is_available():
 else:
     print('GPU: 未检测到 (使用 CPU)')
 PYEOF
-$PY_RUN python "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
+KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN python "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
 rm -f "$VERIFY_SCRIPT"
 
 echo ""
