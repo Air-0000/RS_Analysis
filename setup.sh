@@ -280,6 +280,7 @@ fi
 if [ "$USE_BASE" -eq 1 ]; then
     echo "  使用: $BASE_PY"
     PY_RUN="$BASE_PY"
+    PIP_CMD="$BASE_PY -m pip"
 else
     echo "  base 环境不满足，创建独立环境..."
     ENV_NAME="rs_analysis"
@@ -298,7 +299,9 @@ else
             sleep 5
         done
     fi
-    PY_RUN="conda run -n $ENV_NAME --no-capture-output"
+    CONDA_RUN="conda run -n $ENV_NAME --no-capture-output"
+    PY_RUN="$CONDA_RUN"
+    PIP_CMD="$CONDA_RUN pip"
 fi
 echo ""
 
@@ -329,7 +332,7 @@ for i in 1 2 3; do
         curl -# -fSL --retry 3 --retry-delay 5 \
             "https://mirrors.aliyun.com/pytorch-wheels/cu130/torchvision-0.27.1${WHL_CUDA_SUFFIX}-cp312-cp312-win_amd64.whl" \
             -o "$WHEEL_DIR/torchvision.whl" 2>&1 || { rm -rf "$WHEEL_DIR"; continue; }
-        if $PY_RUN pip install "$WHEEL_DIR/torch.whl" "$WHEEL_DIR/torchvision.whl" $PIP_EXTRA; then
+        if $PIP_CMD install "$WHEEL_DIR/torch.whl" "$WHEEL_DIR/torchvision.whl" $PIP_EXTRA; then
             echo "  ✅ PyTorch 安装完成"
             rm -rf "$WHEEL_DIR"
             break
@@ -337,7 +340,7 @@ for i in 1 2 3; do
         rm -rf "$WHEEL_DIR"
     else
         # 官方源：直接 pip 走 index
-        if $PY_RUN pip install \
+        if $PIP_CMD install \
             --index-url "$TORCH_INDEX_URL" \
             $PIP_EXTRA \
             torch=="$TORCH_VERSION" torchvision=="$TV_VERSION"; then
@@ -355,7 +358,7 @@ echo ""
 echo "📦 安装项目依赖..."
 for i in 1 2 3; do
     echo "  尝试 ($i/3)..."
-    if $PY_RUN pip install \
+    if $PIP_CMD install \
         -r requirements.txt \
         -i "$PIP_INDEX" \
         $PIP_TRUSTED \
@@ -388,7 +391,7 @@ elif torch.backends.mps.is_available():
 else:
     print('GPU: 未检测到 (使用 CPU)')
 PYEOF
-KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN python "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
+KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
 rm -f "$VERIFY_SCRIPT"
 
 echo ""
