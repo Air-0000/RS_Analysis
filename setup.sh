@@ -243,30 +243,67 @@ if [ "$OS_NAME" != "windows" ]; then
     conda init bash 2>/dev/null || true
 fi
 
-# ── 创建环境 ──────────────────────────────────────
-echo "🔧 创建 Conda 环境: $ENV_NAME"
-if conda env list | grep -q "^${ENV_NAME}[[:space:]]"; then
-    echo "  环境已存在，跳过创建"
-else
-    for i in 1 2 3; do
-        echo "  尝试 ($i/3)..."
-        OPTS=""
-        [ -n "$CONDA_CHANNEL" ] && OPTS="$CONDA_CHANNEL"
-        if conda create -y -n "$ENV_NAME" python=3.12 pip $OPTS 2>/dev/null; then
-            echo "  ✅ 创建成功"
-            break
+echo ""
+
+# ── 检测 base 环境是否已满足 ─────────────────
+echo "🔍 检查 base 环境..."
+BASE_PY=""
+for p in python3 python; do
+    command -v "$p" &>/dev/null && BASE_PY="$p" && break
+done
+[ -z "$BASE_PY" ] && [ -f "/d/environment/anaconda3/python.exe" ] && BASE_PY="/d/environment/anaconda3/python.exe"
+
+USE_BASE=0
+if [ -n "$BASE_PY" ]; then
+    HAS_TORCH=$($BASE_PY -c "import torch; print('ok')" 2>/dev/null || echo "")
+    if [ -n "$HAS_TORCH" ]; then
+        MISSING=$($BASE_PY -c "
+import pkg_resources
+reqs = [l.strip() for l in open('requirements.txt') if l.strip() and not l.startswith('#') and 'torch' not in l]
+try:
+    for r in reqs: pkg_resources.require(r)
+    print('ok')
+except: print('missing')
+" 2>/dev/null || echo "missing")
+        if [ "$MISSING" = "ok" ]; then
+            echo "  ✅ base 环境已满足全部依赖"
+            USE_BASE=1
         fi
-        [ "$i" -eq 3 ] && echo "  ❌ 创建失败，请检查网络后重试" && exit 1
-        echo "  5 秒后重试..."
-        sleep 5
-    done
+    fi
+fi
+
+if [ "$USE_BASE" -eq 1 ]; then
+    echo "  使用: $BASE_PY"
+    PY_RUN="$BASE_PY"
+else
+    echo "  base 环境不满足，创建独立环境..."
+    ENV_NAME="rs_analysis"
+    if conda env list | grep -q "^${ENV_NAME}[[:space:]]"; then
+        echo "  环境已存在，跳过创建"
+    else
+        for i in 1 2 3; do
+            echo "  尝试 ($i/3)..."
+            OPTS=""
+            [ -n "$CONDA_CHANNEL" ] && OPTS="$CONDA_CHANNEL"
+            if conda create -y -n "$ENV_NAME" python=3.12 pip $OPTS 2>/dev/null; then
+                echo "  ✅ 创建成功"
+                break
+            fi
+            [ "$i" -eq 3 ] && echo "  ❌ 创建失败，请检查网络后重试" && exit 1
+            sleep 5
+        done
+    fi
+    PY_RUN="conda run -n $ENV_NAME --no-capture-output"
 fi
 echo ""
 
-CONDA_RUN="conda run -n $ENV_NAME --no-capture-output"
-$CONDA_RUN pip cache purge 2>/dev/null || true
+# 检查是否需要装 PyTorch
+NEED_TORCH=0
+$PY_RUN -c "import torch; print('ok')" 2>/dev/null || NEED_TORCH=1
 
-# ── 安装 PyTorch ──────────────────────────────────
+# ── 安装 PyTorch（按需）──────────────────────────
+[ "$NEED_TORCH" -eq 0 ] && echo "📥 PyTorch 已存在，跳过安装 ($($PY_RUN -c "import torch; print(torch.__version__)" 2>/dev/null || echo '?'))" && skip_torch=1
+if [ "${skip_torch:-0}" -eq 0 ]; then
 echo "📥 安装 PyTorch $TORCH_VERSION..."
 PIP_EXTRA="--timeout $PIP_TIMEOUT"
 [ "$TORCH_MIRROR" = "aliyun" ] && PIP_EXTRA="$PIP_EXTRA --trusted-host mirrors.aliyun.com"
@@ -287,7 +324,7 @@ for i in 1 2 3; do
         curl -# -fSL --retry 3 --retry-delay 5 \
             "https://mirrors.aliyun.com/pytorch-wheels/cu130/torchvision-0.27.1${WHL_CUDA_SUFFIX}-cp312-cp312-win_amd64.whl" \
             -o "$WHEEL_DIR/torchvision.whl" 2>&1 || { rm -rf "$WHEEL_DIR"; continue; }
-        if $CONDA_RUN pip install "$WHEEL_DIR/torch.whl" "$WHEEL_DIR/torchvision.whl" $PIP_EXTRA; then
+        if $PY_RUN pip install "$WHEEL_DIR/torch.whl" "$WHEEL_DIR/torchvision.whl" $PIP_EXTRA; then
             echo "  ✅ PyTorch 安装完成"
             rm -rf "$WHEEL_DIR"
             break
@@ -295,7 +332,7 @@ for i in 1 2 3; do
         rm -rf "$WHEEL_DIR"
     else
         # 官方源：直接 pip 走 index
-        if $CONDA_RUN pip install \
+        if $PY_RUN pip install \
             --index-url "$TORCH_INDEX_URL" \
             $PIP_EXTRA \
             torch=="$TORCH_VERSION" torchvision=="$TV_VERSION"; then
@@ -306,13 +343,14 @@ for i in 1 2 3; do
     [ "$i" -eq 3 ] && echo "  ⚠️  PyTorch 安装失败，跳过（可手动安装）" && break
     sleep 3
 done
+fi  # end skip_torch
 echo ""
 
 # ── 安装其他依赖 ──────────────────────────────────
 echo "📦 安装项目依赖..."
 for i in 1 2 3; do
     echo "  尝试 ($i/3)..."
-    if $CONDA_RUN pip install \
+    if $PY_RUN pip install \
         -r requirements.txt \
         -i "$PIP_INDEX" \
         $PIP_TRUSTED \
@@ -345,7 +383,7 @@ elif torch.backends.mps.is_available():
 else:
     print('GPU: 未检测到 (使用 CPU)')
 PYEOF
-$CONDA_RUN python "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
+$PY_RUN python "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
 rm -f "$VERIFY_SCRIPT"
 
 echo ""
