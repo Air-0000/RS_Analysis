@@ -7,7 +7,7 @@
   3. CARAFE (ICCV 2019): 内容感知上采样替换双线性
   4. Focal Loss: 替代 BCE，解决变化像素仅 8-15% 的不平衡
 
-参数量: ~680K (原版 ~625K，仅增加 ~55K)
+参数量: ~1.26M (原版 ~0.96M，增强模块增加 ~0.30M)
 """
 
 import torch
@@ -114,9 +114,6 @@ class EnhancedSiamDiff(nn.Module):
 
 def build_enhanced_cd_model():
     model = EnhancedSiamDiff()
-    params = model.get_param_count()
-    print(f"[Enhanced FC-Siam-diff] 参数量: {params['total']:,} ({params['trainable']:,} 可训练)")
-    print(f"  改进: SCConv + CoordAtt + CARAFE + FocalLoss")
     return model
 
 

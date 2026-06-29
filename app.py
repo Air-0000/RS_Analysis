@@ -19,22 +19,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 HERMES_DIR = str(Path.home() / 'AppData/Local/hermes/hermes-agent')
 sys.path = [p for p in sys.path if p != '' and p != HERMES_DIR]
 
-from models.cnn_cd import build_cnn_model
-from models.unet_tiny import build_unet
+from models.cnn_cd import build_enhanced_cd_model as build_cnn_model
+from models.unet_tiny import build_enhanced_unet as build_unet
 
 st.set_page_config(page_title="遥感图像分析平台", page_icon="🛰️", layout="wide")
-st.markdown("""
-<style>
-.stApp { background: #0e1117; }
-.result-card {
-    background: #1a1d24; border-radius: 12px; padding: 1.5rem; margin: 0.5rem 0;
-    border: 1px solid #2d3139;
-}
-.metric-value { font-size: 2rem; font-weight: bold; color: #00d4aa; text-align: center; }
-.metric-label { font-size: 0.8rem; color: #8b8fa3; text-align: center; text-transform: uppercase; }
-.section-title { color: #e0e0e0; font-size: 1.2rem; margin: 1rem 0; }
-</style>
-""", unsafe_allow_html=True)
 
 
 @st.cache_resource

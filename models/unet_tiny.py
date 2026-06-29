@@ -129,8 +129,6 @@ class EnhancedTinyUNet(nn.Module):
 def build_enhanced_unet(num_classes=1):
     model = EnhancedTinyUNet(out_channels=num_classes)
     params = model.get_param_count()
-    print(f"[Enhanced Tiny U-Net] 参数量: {params['total']:,} ({params['trainable']:,} 可训练)")
-    print(f"  改进: SCConv + CARAFE + CoordAtt")
     return model
 
 
