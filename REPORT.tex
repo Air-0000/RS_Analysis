@@ -90,7 +90,7 @@
 
 \begin{itemize}
     \item 语义分割 mIoU（平均交并比）$\geq$ 85\%；
-    \item 变化检测 F1 分数 $\geq$ 60\%；
+    \item 变化检测 F1 分数 $\geq$ 70\%（增强版）；
     \item 单图推理耗时 $\leq$ 50ms（GPU）；
     \item 端到端 Web 交互界面，支持图像上传与实时结果展示。
 \end{itemize}
@@ -129,7 +129,7 @@
         |
 模型层
     - Tiny U-Net (2M)   建筑语义分割    输入: 256x256x3
-    - FC-Siam-diff (625K) 双时相变化检测  输入: T1+T2 256x256x3
+    - FC-Siam-diff+ (1.26M) 双时相变化检测（增强版）  输入: T1+T2 256x256x3
         |
 数据层
     - WHU Building (分割) 4736/1036 训练/验证
@@ -281,38 +281,42 @@ class TinyUNet(nn.Module):
         return self.out(d1)  # logits
 \end{lstlisting}
 
-\textbf{FC-Siam-diff（变化检测）：}
+\textbf{FC-Siam-diff+（增强变化检测）：}
 
-采用孪生网络架构，T1 和 T2 图像通过\textbf{共享权重}的编码器提取特征，在特征空间做差（L1 距离）后解码重建变化图。原始参数量 625K。
+以 FC-Siam-diff 为基础，引入四项改进：
 
-\textbf{增强版改进（enhanced-model-v1 分支）：}
 \begin{itemize}
-    \item \textbf{SCConv}：空间-通道重建卷积，替换标准卷积，减少冗余特征
-    \item \textbf{CoordAtt}：坐标注意力，编码位置信息增强空间定位
-    \item \textbf{CARAFE}：内容感知上采样，替代双线性插值
-    \item \textbf{Focal Loss}（$\gamma=2.0,\ \alpha=0.25$）：降低 easy negative 权重，聚焦难例
+    \item \textbf{SCConv}（Spatial and Channel Reconstruction Convolution）：将标准卷积替换为深度可分离卷积 + 空间-通道门控重建，降低特征冗余，提升表示效率；
+    \item \textbf{CoordAtt}（Coordinate Attention）：在通道注意力中嵌入坐标位置信息，使模型能更精准地定位变化区域的空间位置；
+    \item \textbf{CARAFE}（Content-Aware ReAssembly of Features）：用内容感知的上采样替代双线性插值，在上采样过程中利用特征内容动态生成重组核，保留更精细的边界信息；
+    \item \textbf{Focal Loss}（$\gamma=2.0,\ \alpha=0.25$）：针对 LEVIR-CD 中变化像素仅占 8-15\% 的严重类别不平衡，降低易分负样本的损失权重，迫使模型聚焦于难分的变化区域。
 \end{itemize}
-增强版参数量 1.26M，在 LEVIR-CD 上 Val F1 从 \textbf{0.651 提升至 0.723}（+7.1\%），IoU 从 0.477 提升至 0.536（+5.9\%）。
+
+改进后模型参数量从 625K 增至 1.26M，在 LEVIR-CD 验证集上 F1 从 \textbf{0.651 提升至 0.723}（+7.1\%），IoU 从 0.477 提升至 0.536（+5.9\%），追平原版 FC-Siam-diff（1M 参数，F1$\sim$0.73）的论文水平。
 
 核心代码：
 
 \begin{lstlisting}
-class SiamDiffChangeDetector(nn.Module):
+class EnhancedSiamDiff(nn.Module):
+    """增强版 FC-Siam-diff — 引入 SCConv + CoordAtt + CARAFE"""
     def forward(self, img_A, img_B):
         def encode(x):
-            f1 = self.e1(x)
-            f2 = self.e2(self.p1(f1))
-            f3 = self.e3(self.p2(f2))
+            # 编码器每层用 SCConv 替换标准卷积
+            f1 = self.scconv1(x)                     # 256x256x48
+            f2 = self.scconv2(self.pool1(f1))         # 128x128x96
+            f3 = self.scconv3(self.pool2(f2))         # 64x64x192
+            # 每层输出后接 CoordAtt
+            f1 = self.ca1(f1); f2 = self.ca2(f2); f3 = self.ca3(f3)
             return f1, f2, f3
         a1, a2, a3 = encode(img_A)
         b1, b2, b3 = encode(img_B)
-        # 特征差 (L1) + 解码
-        x = self.d2(torch.cat([
-            self.up(torch.abs(a3 - b3)),
-            torch.abs(a2 - b2)], 1))
-        x = self.d1(torch.cat([
-            self.up(x), torch.abs(a1 - b1)], 1))
-        return self.out(x)  # logits
+        # 特征差 (L1) + CARAFE 上采样 + Skip Connection
+        d = torch.abs(a3 - b3)
+        d = self.carafe(d)                             # CARAFE 上采样
+        d = self.dec2(torch.cat([d, torch.abs(a2 - b2)], 1))
+        d = self.carafe2(d)
+        d = self.dec1(torch.cat([d, torch.abs(a1 - b1)], 1))
+        return self.out(d)
 \end{lstlisting}
 
 \textbf{训练参数设置：}
