@@ -379,17 +379,16 @@ import torch, sys
 print(f'PyTorch: {torch.__version__}')
 
 if torch.cuda.is_available():
-    print(f'CUDA 可用: True')
+    print('CUDA: True')
     print(f'GPU: {torch.cuda.get_device_name(0)}')
-    print(f'显存: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+    print(f'VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
     x = torch.randn(100, 100).cuda()
     y = x @ x.T
-    print(f'CUDA 矩阵运算: OK ({y.sum().item():.2f})')
+    print(f'CUDA matmul: OK ({y.sum().item():.2f})')
 elif torch.backends.mps.is_available():
-    print(f'MPS 可用: True (Apple Silicon)')
-    print('MPS 部分算子支持有限，训练推荐 CPU')
+    print('MPS: True (Apple Silicon)')
 else:
-    print('GPU: 未检测到 (使用 CPU)')
+    print('GPU: not detected (using CPU)')
 PYEOF
 KMP_DUPLICATE_LIB_OK=TRUE $PY_RUN "$VERIFY_SCRIPT" 2>&1 || echo "  ⚠️  验证失败（可能 torch 未正确安装）"
 rm -f "$VERIFY_SCRIPT"
