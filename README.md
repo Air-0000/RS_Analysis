@@ -61,6 +61,11 @@ pip install -r requirements.txt
 # 启动 Web 界面
 streamlit run app.py
 
+# CLI 离线推理与示例演示
+python infer.py --task demo                    # 自动在示例图像上运行分割与变化检测
+python infer.py --task segment --image samples/whu_seg_A.png --output outputs/infer/seg.png
+python infer.py --task cd --img_a samples/cd_A.png --img_b samples/cd_B.png --output outputs/infer/cd.png
+
 # 训练建筑物语义分割模型
 python train_segment.py --epochs 50 --batch_size 16 --lr 1e-3
 

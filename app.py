@@ -16,8 +16,6 @@ import cv2
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
-HERMES_DIR = str(Path.home() / 'AppData/Local/hermes/hermes-agent')
-sys.path = [p for p in sys.path if p != '' and p != HERMES_DIR]
 
 from models.cnn_cd import build_cnn_model
 from models.unet_tiny import build_unet

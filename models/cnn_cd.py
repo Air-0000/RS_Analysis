@@ -77,6 +77,9 @@ def build_cnn_model():
     return model
 
 
+FCSiamDiff = SiamDiffChangeDetector
+
+
 if __name__ == '__main__':
     m = build_cnn_model()
     x = torch.randn(2, 3, 256, 256)
